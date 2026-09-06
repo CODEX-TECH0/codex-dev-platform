@@ -1,0 +1,323 @@
+openapi: 3.0.3
+info:
+  title: Codex API
+  version: "1.0"
+  description: >
+    Codex V1 developer API. All protected endpoints require an API key sent as
+    a bearer token. Base URL is your Supabase project's Edge Functions URL:
+    https://<project-ref>.functions.supabase.co
+servers:
+  - url: https://<project-ref>.functions.supabase.co
+security:
+  - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: "cx_test_... or cx_live_..."
+  schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data: { type: object }
+        request_id: { type: string, example: req_abc123 }
+    ErrorEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          properties:
+            code: { type: string, example: INVALID_API_KEY }
+            message: { type: string }
+        request_id: { type: string }
+  responses:
+    Error:
+      description: Standardized error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+paths:
+  /v1/uuid/generate:
+    post:
+      summary: Generate one or more UUID v4 values
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                count: { type: integer, minimum: 1, maximum: 100, default: 1 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/hash:
+    post:
+      summary: Hash an input string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties:
+                input: { type: string }
+                algorithm: { type: string, enum: [SHA-256, SHA-384, SHA-512], default: SHA-256 }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/base64/encode:
+    post:
+      summary: Base64-encode a UTF-8 string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties: { input: { type: string } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/base64/decode:
+    post:
+      summary: Decode a Base64 string to UTF-8
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties: { input: { type: string } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/json/validate:
+    post:
+      summary: Validate a JSON string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties: { input: { type: string } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/json/format:
+    post:
+      summary: Pretty-print a JSON string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties:
+                input: { type: string }
+                indent: { type: integer, minimum: 0, maximum: 8, default: 2 }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/json/minify:
+    post:
+      summary: Minify a JSON string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties: { input: { type: string } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/url/encode:
+    post:
+      summary: Percent-encode a string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties: { input: { type: string } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/url/decode:
+    post:
+      summary: Percent-decode a string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties: { input: { type: string } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/url/parse:
+    post:
+      summary: Parse an absolute URL into its components
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties: { input: { type: string } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/timestamp/convert:
+    post:
+      summary: Convert a timestamp between unix seconds, unix ms, and ISO 8601
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value, from]
+              properties:
+                value: { oneOf: [{ type: number }, { type: string }] }
+                from: { type: string, enum: [unix_seconds, unix_ms, iso8601] }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/validate/email:
+    post:
+      summary: Validate email format (does not verify deliverability)
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [input], properties: { input: { type: string } } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/validate/url:
+    post:
+      summary: Validate URL format
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [input], properties: { input: { type: string } } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/validate/uuid:
+    post:
+      summary: Validate UUID format
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [input], properties: { input: { type: string } } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/validate/ip:
+    post:
+      summary: Validate IPv4/IPv6 format
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [input], properties: { input: { type: string } } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/validate/json:
+    post:
+      summary: Validate JSON format
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [input], properties: { input: { type: string } } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/validate/phone:
+    post:
+      summary: Validate E.164 phone number format (does not verify reachability)
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [input], properties: { input: { type: string } } }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/regex/test:
+    post:
+      summary: Test a regular expression against input text
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pattern, input]
+              properties:
+                pattern: { type: string, maxLength: 500 }
+                flags: { type: string }
+                input: { type: string, maxLength: 20000 }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/otp/send:
+    post:
+      summary: Send an OTP code via email
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipient]
+              properties:
+                recipient: { type: string, format: email }
+                channel: { type: string, enum: [email], default: email }
+      responses:
+        '200':
+          description: >
+            OK. In test-mode keys, the response includes `test_code` for local
+            development. Live-mode responses never include the code.
+        default: { $ref: '#/components/responses/Error' }
+
+  /v1/otp/verify:
+    post:
+      summary: Verify a previously sent OTP code
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [verification_id, code]
+              properties:
+                verification_id: { type: string, format: uuid }
+                code: { type: string }
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }

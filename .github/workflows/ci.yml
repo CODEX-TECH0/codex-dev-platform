@@ -1,0 +1,197 @@
+name: CI
+
+# Pipeline shape (per project requirement):
+#   Checkout -> Install -> Typecheck -> Lint -> Test -> Build -> Verify output -> Deploy
+#
+# The build artifact that gets deployed is the EXACT one produced and verified
+# in the build job (passed via upload-artifact/download-artifact) — deploy
+# jobs never re-run their own separate build. A green GitHub Actions run means
+# the code was verified and built; it does NOT by itself mean the live site is
+# updated — that only happens once the deploy jobs (main branch only) finish
+# uploading to Cloudflare Pages.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Build + verify: developer app
+  # ---------------------------------------------------------------------
+  developer-app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/developer
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Manual npm cache keyed on package.json rather than a lockfile: no
+      # package-lock.json is committed yet (this repo has never had
+      # `npm install` run against it — see README). Once you run it locally
+      # and commit apps/developer/package-lock.json, switch this to
+      # actions/setup-node's built-in `cache: npm` +
+      # `cache-dependency-path: apps/developer/package-lock.json` for exact,
+      # reproducible caching instead of this looser package.json-hash cache.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-developer-${{ hashFiles('apps/developer/package.json') }}
+          restore-keys: npm-developer-
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test -- --run
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          test -d dist || { echo "::error::apps/developer/dist was not produced"; exit 1; }
+          test -n "$(ls -A dist)" || { echo "::error::apps/developer/dist is empty"; exit 1; }
+          test -f dist/index.html || { echo "::error::apps/developer/dist/index.html missing"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: developer-dist
+          path: apps/developer/dist
+          retention-days: 7
+
+  # ---------------------------------------------------------------------
+  # Build + verify: super admin app
+  # ---------------------------------------------------------------------
+  super-admin-app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/super-admin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-super-admin-${{ hashFiles('apps/super-admin/package.json') }}
+          restore-keys: npm-super-admin-
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test -- --run
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          test -d dist || { echo "::error::apps/super-admin/dist was not produced"; exit 1; }
+          test -n "$(ls -A dist)" || { echo "::error::apps/super-admin/dist is empty"; exit 1; }
+          test -f dist/index.html || { echo "::error::apps/super-admin/dist/index.html missing"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: super-admin-dist
+          path: apps/super-admin/dist
+          retention-days: 7
+
+  # ---------------------------------------------------------------------
+  # Deploy: uses the artifact built + verified above, never a fresh build.
+  # Only runs on a push to main — never on pull_request.
+  # ---------------------------------------------------------------------
+  deploy-developer:
+    needs: developer-app
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: developer-dist
+          path: dist
+
+      - name: Verify artifact before deploy
+        run: test -f dist/index.html || { echo "::error::Downloaded artifact missing index.html"; exit 1; }
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: codex-developer
+          directory: dist
+
+  deploy-super-admin:
+    needs: super-admin-app
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: super-admin-dist
+          path: dist
+
+      - name: Verify artifact before deploy
+        run: test -f dist/index.html || { echo "::error::Downloaded artifact missing index.html"; exit 1; }
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: codex-super-admin
+          directory: dist
+
+  # ---------------------------------------------------------------------
+  # Deploy: Supabase migrations + Edge Functions. Gated on BOTH frontend
+  # verify jobs passing, so a broken frontend never ships alongside a
+  # backend change.
+  # ---------------------------------------------------------------------
+  deploy-functions:
+    needs: [developer-app, super-admin-app]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Push database migrations
+        run: supabase db push --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy Edge Functions
+        run: supabase functions deploy --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

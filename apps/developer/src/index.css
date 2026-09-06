@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Theme tokens as CSS custom properties, RGB triplets (no "rgb()" wrapper)
+  so Tailwind's rgb(var(--x) / <alpha-value>) pattern can apply opacity
+  modifiers like bg-surface/50. Dark is the product's default and primary
+  identity (see design system); light is a real, fully-specified second
+  theme, not a stub — toggled by ThemeContext adding/removing `.dark` on
+  <html> and persisted via localStorage.
+*/
+:root {
+  --color-bg: 248 250 252;           /* #F8FAFC */
+  --color-surface: 255 255 255;      /* #FFFFFF */
+  --color-border: 226 232 240;       /* #E2E8F0 */
+  --color-text-primary: 15 23 42;    /* #0F172A */
+  --color-text-secondary: 71 85 105; /* #475569 */
+}
+
+.dark {
+  --color-bg: 11 15 20;              /* #0B0F14 */
+  --color-surface: 21 27 35;         /* #151B23 */
+  --color-border: 38 50 65;          /* #263241 */
+  --color-text-primary: 248 250 252; /* #F8FAFC */
+  --color-text-secondary: 148 163 184; /* #94A3B8 */
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Background motion (BackgroundMotion.tsx) — very slow, subtle by design.
+   Neutralized automatically by the reduced-motion override above. */
+@keyframes codex-dash-flow {
+  to {
+    stroke-dashoffset: -400;
+  }
+}
+
+@keyframes codex-node-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.9; }
+}
+
+.codex-signal-line {
+  animation: codex-dash-flow 18s linear infinite;
+}
+
+.codex-signal-line-slow {
+  animation-duration: 26s;
+  animation-direction: reverse;
+}
+
+.codex-node {
+  animation: codex-node-pulse 4s ease-in-out infinite;
+}
+
+.codex-node-delay {
+  animation-delay: 2s;
+}

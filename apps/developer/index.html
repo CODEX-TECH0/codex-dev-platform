@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="description" content="Codex — a developer platform for utility APIs, OTP, webhooks, and more, built on Supabase." />
+    <title>Codex — Developer Platform</title>
+    <script>
+      // Applies the stored theme before first paint to avoid a flash of the
+      // wrong theme. ThemeContext (src/features/theme/ThemeContext.tsx) is
+      // the source of truth after mount; this inline script only handles
+      // the brief window before React hydrates.
+      (function () {
+        try {
+          var pref = localStorage.getItem('codex-theme') || 'dark';
+          var isDark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="bg-bg text-text-primary">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
